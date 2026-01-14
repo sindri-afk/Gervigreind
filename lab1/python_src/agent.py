@@ -6,7 +6,7 @@ import random
 class Agent(object):
 
   def __init__(self):
-    return
+    state = "INIT"
 
   # this method is called on the start of the new environment
   # override it to initialise the agent
