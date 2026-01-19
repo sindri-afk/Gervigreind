@@ -105,7 +105,7 @@ class GGPRequestHandler(BaseHTTPRequestHandler):
 
 def main():
   # TODO: use your own agent here
-  agent = RandomAgent()
+  agent = SimpleSweepAgent()
 
   # read command line argument(s)
   port = 4001
