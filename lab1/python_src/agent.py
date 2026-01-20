@@ -43,36 +43,6 @@ class RandomAgent(Agent):
     return action
 
 #############
-
-# class KingAgent(Agent):
-#   """
-#   Strategy for KingAgent: 
-#   - TURN_ON: 
-#   - GO -> until we find a bump
-#   - When we find a bump we TURN_LEFT until we find another bump
-#   - When we find another bump we TURN_RIGHT x2, and go until we hit a bump
-#   - When we hit a bump there we TURN_RIGHT, GO, TURN_LEFT, GO
-#   - then when we hit a bump TURN_LEFT, GO, TURN_RIGHT, GO etc..
-#   - and always check for bumps
-#   actions: [START, GO, SUCK, TURN_RIGHT, TURN_LEFT]
-#   """
-#   directions = ["N", "S", "W", "E"]
-
-#   def start(self):
-#     self.phase = "INIT"
-#     self.directions = "N"
-
-#     self.x = 0 # the starting pos is always 0,0
-#     self.y = 0
-
-#     self.last_action = None
-
-#   def cleanup(self, percepts):
-#     self.start()
-
-#   def next_action(self, percepts):
-#     dirt = "DIRT" in percepts
-#     bump = "BUMP" in percepts
   
 class SimpleSweepAgent(Agent):
   DIRS = ["N", "E", "S", "W"]
@@ -80,123 +50,194 @@ class SimpleSweepAgent(Agent):
   def start(self):
     self.phase = "INIT"
     self.dir = "N"
+
+    # position relative to starting square (home)
     self.x = 0
     self.y = 0
+
+    # current sweep direction along a row: "E" or "W"
     self.sweep_dir = "E"
+
+    # remembers what we did last turn
     self.last_action = None
+
+    # used only in SHIFT_SOUTH: did we already attempt the south GO?
+    self.shift_tried_go = False
+
     print("SimpleSweepAgent start")
 
   def cleanup(self, percepts):
     self.start()
 
+  def _turn_toward(self, target_dir):
+    """Return TURN_LEFT or TURN_RIGHT to rotate one step toward target_dir."""
+    cur = self.DIRS.index(self.dir)
+    tgt = self.DIRS.index(target_dir)
+    # distances if we go right vs left
+    right_steps = (tgt - cur) % 4
+    left_steps = (cur - tgt) % 4
+    return "TURN_RIGHT" if right_steps <= left_steps else "TURN_LEFT"
+
   def next_action(self, percepts):
     dirt = "DIRT" in percepts
     bump = "BUMP" in percepts
 
-    # --- update internal model ---
+    # -------- update internal model based on last action + current bump ----------
     if self.last_action == "TURN_RIGHT":
       self.dir = self.DIRS[(self.DIRS.index(self.dir) + 1) % 4]
+
     elif self.last_action == "TURN_LEFT":
       self.dir = self.DIRS[(self.DIRS.index(self.dir) - 1) % 4]
-    elif self.last_action == "GO" and not bump:
-      if self.dir == "N": self.y += 1
-      elif self.dir == "S": self.y -= 1
-      elif self.dir == "E": self.x += 1
-      elif self.dir == "W": self.x -= 1
 
-    # --- always clean ---
+    elif self.last_action == "GO":
+      # only move if GO succeeded (no bump)
+      if not bump:
+        if self.dir == "N": self.y += 1
+        elif self.dir == "S": self.y -= 1
+        elif self.dir == "E": self.x += 1
+        elif self.dir == "W": self.x -= 1
+
+    print(f"Phase: {self.phase}, Dir: {self.dir}, Pos: ({self.x},{self.y}), Last: {self.last_action}, Bump: {bump}, Dirt: {dirt}")
+
+    # ---------------- always clean ----------------
     if dirt:
       self.last_action = "SUCK"
       return "SUCK"
 
-    # --- INIT ---
+    # ---------------- INIT ----------------
     if self.phase == "INIT":
       self.phase = "FIND_NORTH"
       self.last_action = "TURN_ON"
       return "TURN_ON"
 
-    # --- find north wall ---
+    # ---------------- find north wall ----------------
     if self.phase == "FIND_NORTH":
       if self.dir != "N":
-        self.last_action = "TURN_RIGHT"
-        return "TURN_RIGHT"
+        act = self._turn_toward("N")
+        self.last_action = act
+        return act
+
+      # if we just tried to go north and bumped => at north wall
       if bump and self.last_action == "GO":
         self.phase = "FIND_WEST"
-        self.last_action = "TURN_LEFT"  # start turning toward W
-        return "TURN_LEFT"
+        # start turning toward west
+        act = self._turn_toward("W")
+        self.last_action = act
+        return act
+
       self.last_action = "GO"
       return "GO"
 
-    # --- find west wall (corner) ---
+    # ---------------- find west wall (north-west corner) ----------------
     if self.phase == "FIND_WEST":
       if self.dir != "W":
-        self.last_action = "TURN_LEFT"
-        return "TURN_LEFT"
+        act = self._turn_toward("W")
+        self.last_action = act
+        return act
+
+      # if we just tried to go west and bumped => at west wall corner
       if bump and self.last_action == "GO":
         self.phase = "SWEEP"
         self.sweep_dir = "E"
+        # let SWEEP handle orientation; do a turn away from wall to avoid GO-bump spam
+        act = self._turn_toward("E")
+        self.last_action = act
+        return act
+
       self.last_action = "GO"
       return "GO"
 
-    # --- sweep row ---
+    # ---------------- sweep row ----------------
     if self.phase == "SWEEP":
-      # face sweep_dir
+      # face along the row
       if self.dir != self.sweep_dir:
-        self.last_action = "TURN_RIGHT"
-        return "TURN_RIGHT"
+        act = self._turn_toward(self.sweep_dir)
+        self.last_action = act
+        return act
 
-      # if bumped at row end -> shift south
+      # if we just tried to go along the row and bumped => end of row
       if bump and self.last_action == "GO":
         self.phase = "SHIFT_SOUTH"
-        self.last_action = "TURN_RIGHT"  # start turning to S
-        return "TURN_RIGHT"
+        self.shift_tried_go = False
+        # begin turning toward south
+        act = self._turn_toward("S")
+        self.last_action = act
+        return act
 
       self.last_action = "GO"
       return "GO"
 
-    # --- shift south one cell ---
+    # ---------------- shift south exactly one cell ----------------
     if self.phase == "SHIFT_SOUTH":
+      # first face south
       if self.dir != "S":
-        self.last_action = "TURN_RIGHT"
-        return "TURN_RIGHT"
+        act = self._turn_toward("S")
+        self.last_action = act
+        return act
 
-      # if we tried to go south and bumped -> finished sweep
-      if bump and self.last_action == "GO":
-        self.phase = "RETURN"
-        # fall through to RETURN next call by turning now:
-        self.last_action = "TURN_RIGHT"
-        return "TURN_RIGHT"
+      # if we already attempted the south GO, interpret the result now
+      if self.shift_tried_go and self.last_action == "GO":
+        if bump:
+          # can't go south => finished mowing
+          self.phase = "RETURN"
+          # start turning toward something sensible for return
+          act = self._turn_toward("W" if self.x > 0 else "E" if self.x < 0 else ("S" if self.y > 0 else "N"))
+          self.last_action = act
+          return act
+        else:
+          # successfully moved south 1 cell => flip sweep direction and continue
+          self.sweep_dir = "W" if self.sweep_dir == "E" else "E"
+          self.phase = "SWEEP"
+          # start turning toward new sweep dir (legal action, no NOOP)
+          act = self._turn_toward(self.sweep_dir)
+          self.last_action = act
+          return act
 
-      # otherwise go south one cell, then flip direction and continue sweeping
+      # otherwise: attempt to go south ONE time
+      self.shift_tried_go = True
       self.last_action = "GO"
-      # after this GO succeeds (no bump), position updates next call
-      self.sweep_dir = "W" if self.sweep_dir == "E" else "E"
-      self.phase = "SWEEP"
       return "GO"
 
-    # --- return to (0,0) ---
+    # ---------------- return to home (0,0) ----------------
     if self.phase == "RETURN":
+      # If we bumped on a GO in return mode, our model might be wrong.
+      # Fix by snapping the coordinate we were trying to reduce to 0.
+      if bump and self.last_action == "GO":
+        if self.dir == "S" and self.y > 0: self.y = 0
+        if self.dir == "N" and self.y < 0: self.y = 0
+        if self.dir == "W" and self.x > 0: self.x = 0
+        if self.dir == "E" and self.x < 0: self.x = 0
+
+      # move x toward 0 first
       if self.x != 0:
         target = "W" if self.x > 0 else "E"
         if self.dir != target:
-          self.last_action = "TURN_RIGHT"
-          return "TURN_RIGHT"
+          act = self._turn_toward(target)
+          self.last_action = act
+          return act
         self.last_action = "GO"
         return "GO"
 
+      # then move y toward 0
       if self.y != 0:
         target = "S" if self.y > 0 else "N"
         if self.dir != target:
-          self.last_action = "TURN_RIGHT"
-          return "TURN_RIGHT"
+          act = self._turn_toward(target)
+          self.last_action = act
+          return act
         self.last_action = "GO"
         return "GO"
 
-      # At home (0,0)
+      # at home
       self.phase = "OFF"
       self.last_action = "TURN_OFF"
       return "TURN_OFF"
 
-    # --- OFF fallback ---
+    # ---------------- off ----------------
+    if self.phase == "OFF":
+      self.last_action = "TURN_OFF"
+      return "TURN_OFF"
+
+    # fallback
     self.last_action = "TURN_OFF"
     return "TURN_OFF"
