@@ -1,4 +1,6 @@
 import collections
+import heapq
+import time
 
 ######################
 
@@ -93,14 +95,66 @@ class AStarSearch(SearchAlgorithm):
 		self.max_frontier_size = 0
 		self.goal_node = None
 
-		# TODO implement the search here
-		# Update nb_node_expansions and max_frontier_size while doing the search:
-		# - nb_node_expansions should be incremented by one for each node popped from the frontier
-		# - max_frontier_size should be the largest size of the frontier observed during the search measured in number of nodes
-		# Once a goal node has been found, set the goal_node variable to it, this should take care of get_plan() and get_plan_cost() below,
-		# as long as the node contains the right information.
+		start_time = time.time()
 
+		# --- 1. Initial state ---
+		start_state = env.get_current_state()
+		start_cost = 0
+
+		# Node.value stores PATH COST g (important for get_plan_cost)
+		start_node = Node(start_cost, None, start_state, None)
+
+		# Frontier: priority queue ordered by f = g + h
+		frontier = []
+		tie = 0
+		start_f = start_cost + self.heuristics.eval(start_state)
+		heapq.heappush(frontier, (start_f, tie, start_node))
+
+		# Best cost found so far for each state
+		best_cost = {start_state: 0}
+
+		self.max_frontier_size = 1
+
+		# --- 2. Main A* loop ---
+		while frontier:
+			self.max_frontier_size = max(self.max_frontier_size, len(frontier))
+
+			f, _, node = heapq.heappop(frontier)
+
+			# REQUIRED by assignment: count every pop
+			self.nb_node_expansions += 1
+
+			state = node.state
+			cost = node.value
+
+			# Ignore outdated nodes
+			if cost > best_cost.get(state, float("inf")):
+				continue
+
+			# --- 3. Goal test ---
+			if env.is_goal_state(state):
+				self.goal_node = node
+				break
+
+			# --- 4. Expand successors ---
+			for action in env.get_legal_actions(state):
+				next_state = env.get_next_state(state, action)
+				step_cost = env.get_cost(state, action)
+				new_cost = cost + step_cost
+
+				if new_cost < best_cost.get(next_state, float("inf")):
+					best_cost[next_state] = new_cost
+					child = Node(new_cost, node, next_state, action)
+
+					tie += 1
+					f_value = new_cost + self.heuristics.eval(next_state)
+					heapq.heappush(frontier, (f_value, tie, child))
+
+					self.max_frontier_size = max(self.max_frontier_size, len(frontier))
+
+		self.runtime_seconds = time.time() - start_time
 		return
+
 
 	def get_plan(self):
 		if not self.goal_node:
