@@ -97,11 +97,8 @@ class AStarSearch(SearchAlgorithm):
 
 		start_time = time.time()
 
-		# --- 1. Initial state ---
 		start_state = env.get_current_state()
 		start_cost = 0
-
-		# Node.value stores PATH COST g (important for get_plan_cost)
 		start_node = Node(start_cost, None, start_state, None)
 
 		# Frontier: priority queue ordered by f = g + h
