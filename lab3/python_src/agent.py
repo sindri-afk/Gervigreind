@@ -66,6 +66,7 @@ class VacuumCleanerAgent(Agent):
     self.plan = self.search_algorithm.get_plan()
 
     end_time = time.process_time()
+    runtime = start_time - end_time
 
     print("planning took %.2fs" % (end_time-start_time))
     print("number of node expansions: %d" % self.search_algorithm.get_nb_node_expansions())
@@ -78,6 +79,11 @@ class VacuumCleanerAgent(Agent):
     print("plan length: %d" % len(self.plan))
     print("effective branching factor: %.2f" % (math.log(self.search_algorithm.get_nb_node_expansions()) / math.log(len(self.plan))))
     print("plan cost: %d" % self.search_algorithm.get_plan_cost())
+
+    # with open("results.txt", "a") as f:
+    #   f.write("Environment size: %d x %d\n" % (self.env.width, self.env.height))
+    #   f.write("Number of dirt cells: %d\n" % len(self.env.dirts))
+    #   f.write("Search runtime (s): %.4f\n" % runtime)
     return
 
   def next_action(self, percepts):

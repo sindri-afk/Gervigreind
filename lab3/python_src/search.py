@@ -101,7 +101,6 @@ class AStarSearch(SearchAlgorithm):
 		start_cost = 0
 		start_node = Node(start_cost, None, start_state, None)
 
-		# Frontier: priority queue ordered by f = g + h
 		frontier = []
 		tie = 0
 		start_f = start_cost + self.heuristics.eval(start_state)
@@ -112,28 +111,26 @@ class AStarSearch(SearchAlgorithm):
 
 		self.max_frontier_size = 1
 
-		# --- 2. Main A* loop ---
+		# start th A* search
 		while frontier:
 			self.max_frontier_size = max(self.max_frontier_size, len(frontier))
 
 			f, _, node = heapq.heappop(frontier)
 
-			# REQUIRED by assignment: count every pop
 			self.nb_node_expansions += 1
 
 			state = node.state
 			cost = node.value
 
-			# Ignore outdated nodes
+			# If this node does not have a better path then we continue
 			if cost > best_cost.get(state, float("inf")):
 				continue
 
-			# --- 3. Goal test ---
+			# check if the current node is the goal state
 			if env.is_goal_state(state):
 				self.goal_node = node
 				break
 
-			# --- 4. Expand successors ---
 			for action in env.get_legal_actions(state):
 				next_state = env.get_next_state(state, action)
 				step_cost = env.get_cost(state, action)
