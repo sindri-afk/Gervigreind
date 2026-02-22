@@ -87,3 +87,38 @@ class RandomAgent(Agent):
             return "noop"
 
 
+class QueenBattleAgent(Agent):
+    def __init__(self):
+        self.role = None
+        self.play_clock = None
+        self.my_turn = False
+        self.width = 0
+        self.height = 0
+        self.white_queens = set()
+        self.black_queens = set()
+        self.burned_squares = set()
+        self.max_depth = 4 
+
+    def start(self, role, width, height, play_clock, white_positions, black_positions):
+        self.play_clock = play_clock
+        self.role = role
+        print(f"Playing {role} on a {width}x{height} board with {play_clock}s per move")
+        print(f"White starting positions: {white_positions}")
+        print(f"Black starting positions: {black_positions}")
+
+        self.width = width
+        self.height = height
+
+        self.white_queens = set(white_positions)
+        self.black_queens = set(black_positions)
+
+        self.burned_squares = set()
+
+        self.my_turn = role != "white"
+
+    def next_action(self, last_action):
+        pass
+        
+
+
+

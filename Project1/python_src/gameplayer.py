@@ -139,7 +139,7 @@ class GGPRequestHandler(BaseHTTPRequestHandler):
 
 def main():
     # TODO: use your own agent here
-    agent = RandomAgent()
+    agent = QueenBattleAgent()
 
     # read command line argument(s)
     port = 4001
