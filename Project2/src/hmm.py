@@ -33,7 +33,7 @@ class HMM:
         for i in range(self.num_states):
             row_sum = A_counts[i].sum()
             if row_sum > 0:
-                A[i] = A_counts[i] / row_sum
+                A[i] = (A_counts[i] + self.reg) / (row_sum + self.reg * self.num_states)
         self.A = A
         return self.A
     
