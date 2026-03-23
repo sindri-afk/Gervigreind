@@ -1,0 +1,179 @@
+[[  9.35808832 -11.6079142    7.97491282 ...  -2.99197387  -0.30941022
+    1.21214479]
+ [  9.10207265 -15.90608757  12.87961892 ...  -2.77419234  -0.2381221
+    1.36966937]
+ [  9.240245   -17.88253594  10.25540483 ...   0.06856937  -0.30517794
+    0.93415601]
+ ...
+ [  9.56284671 -21.79556792  10.3874251  ...  -1.4450631    0.33943146
+   -1.03631603]
+ [  9.09157634 -21.00321549   7.33991192 ...  -0.51555591  -0.3023151
+   -0.19756462]
+ [  8.89580014 -12.68914425   5.09496255 ...   0.11315673  -0.42120726
+    0.15305554]]
+
+Shape: (T, 39)
+T = number of frames (time steps)
+39 = number of features per frame
+
+| Frame (time) | Feature 1 | Feature 2 | ... | Feature 39 |
+| ------------ | --------- | --------- | --- | ---------- |
+| t = 0        | 9.35      | -11.60    | ... | 1.21       |
+| t = 1        | 9.10      | -15.90    | ... | 1.36       |
+| t = 2        | 9.24      | -17.88    | ... | 0.93       |
+
+
+What is a "frame"?
+each row = short slice of audio
+from the assignment:
+    - window = 25ms
+    - step = 10ms
+so: 
+    - every row = ~10ms later than the previous one
+
+Time-wise:
+
+| Frame index | Time (seconds) |
+| ----------- | -------------- |
+| 0           | 0.00 s         |
+| 1           | 0.01 s         |
+| 2           | 0.02 s         |
+| 100         | 1.00 s         |
+
+
+what are the 39 numbers?
+    - 13 MFCCs (Mel-Frequency Cepstral Coefficients)
+    - 13 delta MFCCs (first derivative of MFCCs)
+    - 13 delta-delta MFCCs (second derivative of MFCCs)
+
+so: 
+[ mfcc_1, ..., mfcc_13,
+  delta_1, ..., delta_13,
+  delta2_1, ..., delta2_13 ]
+
+
+We know that the observation sequences are O1:T
+O[0] = [9.35, -11.60, ..., 1.21]
+O[1] = [9.10, -15.90, ..., 1.36]
+O[2] = [9.24, -17.88, ..., 0.93]
+
+these are the observations
+
+what's missing?
+we don't know the phoneme yet
+this is where the .lab comes in
+So we create:
+    - X = ["pau", "pau", "ao", "ao", ..., "pau"] 
+
+So then we get pairs:
+    - (O[0], X[0])
+    - (O[1], X[1])
+    - (O[2], X[2])
+    - ...
+
+
+The key idea is:
+each row:
+    - "This is what the sound looks like at time t"
+the .lab file:
+    - "This is what phoneme is being spoken at time t"
+Your job:
+    - Match them together
+
+
+label_seq_idx = [
+    [28, 28, 16, 16, ...],   # utterance 1
+    [5, 5, 5, 12, ...],      # utterance 2
+    ...
+]
+
+
+what does estimating pi do?
+well it is a probability distribution over the initial states
+it is basically estimating what phoneme is most likely to be spoken at the beginning of an utterance
+and this is important for the HMM because when the HMM starts (time t = 0), it needs to know:
+    - Where do I begin?
+
+which is what pi gives us: the probability of starting in each phoneme state
+
+ex: 
+[28, 28, 16, ...]   # starts with 28
+[5, 5, 5, ...]      # starts with 5
+[28, 16, 16, ...]   # starts with 28
+[5, 2, 2, ...]      # starts with 5
+[28, 28, 28, ...]   # starts with 28
+count: state 28 --> 3 times
+       state 5 --> 2 times
+
+What phoenems tend to start in speech
+
+
+A in HMM:
+count how often state i goes to state j, then normalize per row to get probabilities
+
+
+Sigma in HMM: 
+for each state i, calculate the mean and covariance of the observations that are labeled with that state
+This gives us the parameters of the Gaussian distribution for each state, which is used to calculate the likelihood of observing a particular feature vector given that state.
+
+Basically:
+for each state (phoneme), we want:
+    not just average (mu), but spread and relationship between features (covariance)
+
+Forget 39 features, imagine:
+X = [
+  [1, 2],
+  [3, 4],
+  [5, 6]
+]
+
+each row = one sample (observation)
+each column = one feature 
+
+What covariance captures:
+it tells you:
+    - how much feature 1 varies
+    - how much feature 2 varies
+    - how much feature 1 and feature 2 vary together (covariance)
+
+what does np.cov do?
+ex: cov = np.cov(X, rowvar=False)
+important: rowvar=False means that rows are observations and columns are features
+
+Output: for 2 features you get:
+
+[ [var(feature1),  cov(f1, f2)]
+  [cov(f2, f1),   var(feature2)] ]
+
+Example result:
+[ [4, 4]
+  [4, 4] ]
+
+this means: 
+    - both features vary the same
+    - they are strongly correlated (covariance is high)
+
+In our case:
+X.shape = (num_frames_for_state, 39)
+so:
+np.cov(X, rowvar=False) returns: (39, 39) covariance matrix for that phoneme
+
+
+what is np.eye?
+it creates an identity matrix of size n x n
+[1 0 0]
+[0 1 0]
+[0 0 1]
+in our case:
+np.eye(self.feature_dim) creates a 39 x 39 identity matrix
+
+what is feature_dim?
+from our data features.shape = (T, 39)
+so feature_dim = 39
+
+what is self.reg? 
+this is a small number added to the diagonal of the covariance matrix to ensure it is positive definite and invertible
+it means: "add a tiny bit of noise to the diagonal"
+why do we add it?
+because sometimes the covariance matrix can be singular (not invertible) if the features are highly correlated
+And later we will compute: Gaussian --> requires the inverse of the covariance matrix

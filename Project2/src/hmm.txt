@@ -1,0 +1,60 @@
+    def estimate_A(self, label_seq_idx):
+        A_counts = np.zeros((self.num_states, self.num_states)) 
+        for labels in label_seq_idx:
+            for t in range(len(labels) - 1):
+                i = labels[t]
+                j = labels[t + 1]
+                A_counts[i][j] += 1
+        
+        A = np.zeros_like(A_counts)
+
+        for i in range(self.num_states):
+            row_sum = A_counts[i].sum()
+            if row_sum > 0:
+                A[i] = A_counts[i] / row_sum
+        return A
+    
+    def estimate_mu(self, label_seq_idx, observation_seq):
+        # 1. collect all features per state
+        state_features = [[] for _ in range(self.num_states)]
+
+        for features, labels, in zip(observation_seq, label_seq_idx):
+            for x_t, state in zip(features, labels):
+                state_features[state].append(x_t)
+        
+        # 2. compute mean per state
+        mu = np.zeros((self.num_states, self.feature_dim))
+        for state in range(self.num_states):
+            if len(state_features[state]) == 0:
+                continue
+            X = np.array(state_features[state])
+            mu[state] = np.mean(X, axis=0)
+        
+        return mu
+
+    def estimate_sigma(self, observation_seq, label_seq_idx):
+        # for each state (phoneme) we want: "How do the 39 features vary together?"
+        # not just average (mu), but spread and relationships
+        
+        state_features = [[] for _ in range(self.num_states)]
+
+        for features, labels in zip(observation_seq, label_seq_idx):
+            for x_t, state in zip(features, labels):
+                state_features[state].append(x_t)
+        
+        Sigma = np.zeros((self.num_states, self.feature_dim, self.feature_dim))
+
+        for state in range(self.num_states):
+            X = np.array(state_features[state])
+
+            if len(X) == 0:
+                continue
+
+            if len(X) == 1:
+                Sigma[state] = np.eye(self.feature_dim) * self.reg
+            else:
+                cov = np.cov(X, rowvar=False)
+                cov += np.eye(self.feature_dim) * self.reg
+                Sigma[state] = cov
+
+        return Sigma

@@ -1,0 +1,1 @@
+til þess að komast inn á venv-ið: source ~/.venvs/speechenv/bin/activate 

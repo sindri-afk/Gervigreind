@@ -1,0 +1,15 @@
+# install python_speech_features, numpy, scipy:
+python3 -m venv ~/.venvs/speechenv
+source ~/.venvs/speechenv/bin/activate 
+pip install python_speech_features numpy scipy
+
+# Download dataset:
+wget http://festvox.org/cmu_arctic/cmu_arctic/packed/cmu_us_slt_arctic-0.95-release.tar.bz2
+
+# Split data into train/test/val
+src/train_test_split.py
+
+# Generate feature vectors
+src/generate_features.py
+
+# 
