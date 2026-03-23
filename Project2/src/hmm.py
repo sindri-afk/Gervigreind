@@ -90,5 +90,31 @@ class HMM:
         self.Sigma = self.estimate_sigma(label_seq_idx, observation_seq)
 
     def log_emission_prob(self, state, x_t):
-        # klára þetta function
-        pass
+        # get parameters for this state
+        mu_i = self.mu[state] # shape: (d)
+        Sigma_i = self.Sigma[state] # shape: (d, d)
+
+        # difference between observation and mean
+        diff = x_t - mu_i
+
+        # inverse and determinant of covariance
+        Sigma_inv = np.linalg.inv(Sigma_i)
+        det_Sigma = np.linalg.det(Sigma_i)
+
+        # in case numerical issues make det non-positive
+        if det_Sigma <= 0:
+            det_Sigma += 0.0001
+        
+        d = self.feature_dim
+
+        # quadratic term: (x-mu)^T Sigma^{-1} {x-mu}
+        quad = diff.T @ Sigma_inv @ diff
+
+        # log Gaussian probability
+        log_prob = -0.5 * (
+            d * np.log(2 * np.pi)
+            + np.log(det_Sigma)
+            + quad
+        )
+
+        return log_prob

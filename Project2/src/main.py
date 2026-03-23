@@ -2,12 +2,16 @@ from data_loader import DataLoader
 from align import Align
 import os
 
+OUT_DIR = "../data/out"
+LAB_DIR = "../data/cmu_us_slt_arctic/lab"
 
 def main():
-    loader = DataLoader("../data/out", "../data/cmu_us_slt_arctic/lab")
+    loader = DataLoader(OUT_DIR, LAB_DIR)
     aligner = Align()
     
     train_basenames = loader.load_split("train")
+    test_basenames = loader.load_split("test")
+    val_basenames = loader.load_split("val")
 
     observation_seq = []
     label_seq = []
